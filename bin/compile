@@ -1,0 +1,60 @@
+#!/bin/bash
+export_env_dir() {
+  env_dir=$1
+  whitelist_regex=${2:-''}
+  blacklist_regex=${3:-'^(PATH|GIT_DIR|CPATH|CPPATH|LD_PRELOAD|LIBRARY_PATH)$'}
+  if [ -d "$env_dir" ]; then
+    for e in $(ls $env_dir); do
+      echo "$e" | grep -E "$whitelist_regex" | grep -qvE "$blacklist_regex" &&
+      export "$e=$(cat $env_dir/$e)"
+      :
+    done
+  fi
+}
+BUILD_DIR=$1
+CACHE_DIR=$2
+ENV_DIR=$3
+
+export_env_dir $ENV_DIR
+
+TESSERACT_OCR_VERSION=3.02
+TESSERACT_OCR_DATA_VERSION=3.02
+
+TESSERACT_OCR_TGZ=tesseract-ocr-$TESSERACT_OCR_VERSION.tar.gz
+
+INSTALL_DIR=$BUILD_DIR/vendor/tesseract-ocr/
+LEPTONICA_DIR=$BUILD_DIR/vendor/
+INSTALL_DIR_TRAINING_DATA=$BUILD_DIR/vendor/
+TESSERACT_OCR_DIR=${HOME}/vendor/tesseract-ocr
+LANG_OCR_DIR=${HOME}/vendor/
+
+ENVSCRIPT=$BUILD_DIR/.profile.d/tesseract-ocr.sh
+
+TESSERACT_OCR_LANGUAGES=eng,vie
+
+echo "-----> Giai Nen Tap Tin Tesseract-OCR"
+mkdir -p $INSTALL_DIR
+curl https://dl.dropboxusercontent.com/s/6huw1qw682iv54p/$TESSERACT_OCR_TGZ -o - | tar -xz -C $INSTALL_DIR -f -
+
+echo '-----> Kiem Tra Du Lieu Tesseract-OCR-Data'
+if [ $TESSERACT_OCR_LANGUAGES ]
+then
+   array=(${TESSERACT_OCR_LANGUAGES//,/ })
+   for i in "${!array[@]}"
+   do
+    lang="${array[i]}"
+    echo '-----> Giai Nen Tap Tin Tesseract-OCR-Data' $lang
+    tar -zxvf tesseract-ocr-$TESSERACT_OCR_DATA_VERSION.$lang.tar.gz -C $INSTALL_DIR_TRAINING_DATA
+
+   done
+fi
+
+echo "-----> Xay Dung Moi Truong Cho Tesseract-OCR"
+mkdir -p $BUILD_DIR/.profile.d
+echo "export PATH=\"$TESSERACT_OCR_DIR/bin:\$PATH\"" > $ENVSCRIPT
+echo "export LD_LIBRARY_PATH=\"$TESSERACT_OCR_DIR/lib:\$LD_LIBRARY_PATH\"" >> $ENVSCRIPT
+echo "export TESSDATA_PREFIX=\"$TESSERACT_OCR_DIR/\"" >> $ENVSCRIPT
+echo "export CPATH=\"$LANG_OCR_DIR:\$CPATH\"" >> $ENVSCRIPT
+echo $INSTALL_DIR_TRAINING_DATA:$CPATH > $ENV_DIR/CPATH
+echo "export FFI_INLINER_PATH=\"$CACHE_DIR\"" >> $ENVSCRIPT
+echo $CACHE_DIR > $ENV_DIR/FFI_INLINER_PATH
